@@ -345,9 +345,20 @@ bool load_scene_gltf(const char* in_path, HRSceneInstRef scnRef, bool convert_ma
 //  std::vector<MaterialData_pbrMR> materials;
   {
 //    materials.reserve(gltfModel.materials.size());
+    {
+      HRMaterialRef matRef = hrMaterialCreate(L"No material");
+      hrMaterialOpen(matRef, HR_WRITE_DISCARD);
+      auto matNode = hrMaterialParamNode(matRef);
+
+      auto diffuse = matNode.append_child(L"diffuse");
+      auto gray = LiteMath::make_float4(0.5f, 0.5f, 0.5f, 1.0f);
+      HydraXMLHelpers::WriteFloat4(diffuse.append_child(L"color").append_attribute(L"val"), gray);
+
+      hrMaterialClose(matRef);
+    }
+
     for(const tinygltf::Material &gltfMat : gltfModel.materials)
     {
-      constexpr int32_t HAPI_TEX_ID_OFFSET = 1; //HydraAPI reserves texture id = 0 for special texture
       MaterialData_pbrMR mat = materialDataFromGLTF(gltfMat, gltfModel.textures, HAPI_TEX_ID_OFFSET);
 //      materials.push_back(mat);
 
@@ -453,13 +464,12 @@ bool convert_gltf_to_hydra(const char* src_path, const char* dest_path, bool con
 
   add_default_light(scnRef);
   auto camRef    = add_default_camera();
-
-  HRRenderRef renderRef;
-  renderRef.id = -1;
-  //  auto renderRef = add_default_render(0);
+  auto defaultRender = add_default_render(0);
 
   hrSceneClose(scnRef);
 
+  HRRenderRef renderRef;
+  renderRef.id = -1;
   hrFlush(scnRef, renderRef, camRef);
 
   hrSceneLibraryClose();

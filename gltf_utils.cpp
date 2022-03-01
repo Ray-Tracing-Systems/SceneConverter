@@ -1,4 +1,5 @@
 #include "gltf_utils.h"
+#include "convert_gltf.h"
 #include <iostream>
 
 LiteMath::float4x4 rotMatrixFromQuaternion(const LiteMath::float4 &q)
@@ -179,7 +180,7 @@ cmesh::SimpleMesh simpleMeshFromGLTFMesh(const tinygltf::Model &a_model, const t
         simpleMesh.vNorm4f[(vertexStart + v) * 4 + 3] = normalsBuffer ? 1.0f : 0.0f;
 
         simpleMesh.vTexCoord2f[(vertexStart + v) * 2 + 0] = texCoordsBuffer ? texCoordsBuffer[v * 2 + 0] : 0.0f;
-        simpleMesh.vTexCoord2f[(vertexStart + v) * 2 + 1] = texCoordsBuffer ? texCoordsBuffer[v * 2 + 1] : 0.0f;
+        simpleMesh.vTexCoord2f[(vertexStart + v) * 2 + 1] = texCoordsBuffer ? 1.0f - texCoordsBuffer[v * 2 + 1] : 0.0f;
 
         simpleMesh.vTang4f[(vertexStart + v) * 4 + 0] = tangentsBuffer ? tangentsBuffer[v * 4 + 0] : 0.0f;
         simpleMesh.vTang4f[(vertexStart + v) * 4 + 1] = tangentsBuffer ? tangentsBuffer[v * 4 + 1] : 0.0f;
@@ -197,7 +198,7 @@ cmesh::SimpleMesh simpleMeshFromGLTFMesh(const tinygltf::Model &a_model, const t
       auto indexCount = static_cast<uint32_t>(accessor.count);
 
       std::fill(simpleMesh.matIndices.begin() + firstIndex / 3,
-            simpleMesh.matIndices.begin() + (firstIndex + indexCount) / 3, glTFPrimitive.material);
+                simpleMesh.matIndices.begin() + (firstIndex + indexCount) / 3, glTFPrimitive.material + HAPI_MAT_ID_OFFSET);
 
       switch(accessor.componentType)
       {
