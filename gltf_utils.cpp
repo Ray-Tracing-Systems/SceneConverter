@@ -5,19 +5,19 @@ LiteMath::float4x4 rotMatrixFromQuaternion(const LiteMath::float4 &q)
 {
   LiteMath::float4x4 rot{};
 
-  rot.m_col[0][0] = 2 * (q[0] * q[0] + q[1] * q[1]) - 1;
-  rot.m_col[0][1] = 2 * (q[1] * q[2] + q[0] * q[3]);
-  rot.m_col[0][2] = 2 * (q[1] * q[3] - q[0] * q[2]);
+  rot.m_col[0][0] = 1 - 2 * (q[1] * q[1] + q[2] * q[2]);
+  rot.m_col[0][1] = 2 * (q[0] * q[1] + q[2] * q[3]);
+  rot.m_col[0][2] = 2 * (q[0] * q[2] - q[1] * q[3]);
   rot.m_col[0][3] = 0.0f;
 
-  rot.m_col[1][0] = 2 * (q[1] * q[2] - q[0] * q[3]);
-  rot.m_col[1][1] = 2 * (q[0] * q[0] + q[2] * q[2]) - 1;
-  rot.m_col[1][2] = 2 * (q[2] * q[3] + q[0] * q[1]);
+  rot.m_col[1][0] = 2 * (q[0] * q[1] - q[2] * q[3]);
+  rot.m_col[1][1] = 1 - 2 * (q[0] * q[0] + q[2] * q[2]);
+  rot.m_col[1][2] = 2 * (q[1] * q[2] + q[0] * q[3]);
   rot.m_col[1][3] = 0.0f;
 
-  rot.m_col[2][0] = 2 * (q[1] * q[3] + q[0] * q[2]);
-  rot.m_col[2][1] = 2 * (q[2] * q[3] - q[0] * q[1]);
-  rot.m_col[2][2] = 2 * (q[0] * q[0] + q[3] * q[3]) - 1;
+  rot.m_col[2][0] = 2 * (q[0] * q[2] + q[1] * q[3]);
+  rot.m_col[2][1] = 2 * (q[1] * q[2] - q[0] * q[3]);
+  rot.m_col[2][2] = 1 - 2 * (q[0] * q[0] + q[1] * q[1]);
   rot.m_col[2][3] = 0.0f;
 
   rot.m_col[3][0] = 0.0f;
@@ -61,7 +61,16 @@ LiteMath::float4x4 transformMatrixFromGLTFNode(const tinygltf::Node &node)
   return nodeMatrix;
 }
 
-MaterialData_pbrMR materialDataFromGLTF(const tinygltf::Material &gltfMat, int32_t texIdOffset)
+int getImageId(int32_t textureIndex, const std::vector<tinygltf::Texture> &gltfTextures, int32_t texIdOffset)
+{
+  if(textureIndex < 0)
+    return textureIndex;
+
+  return gltfTextures[textureIndex].source + texIdOffset;
+}
+
+MaterialData_pbrMR materialDataFromGLTF(const tinygltf::Material &gltfMat, const std::vector<tinygltf::Texture> &gltfTextures,
+                                        int32_t texIdOffset)
 {
   MaterialData_pbrMR mat = {};
   auto& baseColor = gltfMat.pbrMetallicRoughness.baseColorFactor;
@@ -80,12 +89,11 @@ MaterialData_pbrMR materialDataFromGLTF(const tinygltf::Material &gltfMat, int32
   auto& emission = gltfMat.emissiveFactor;
   mat.emissionColor  = LiteMath::float3(emission[0], emission[1], emission[2]);
 
-  // @TODO: textures
-  mat.baseColorTexId = gltfMat.pbrMetallicRoughness.baseColorTexture.index + texIdOffset;
-  mat.emissionTexId  = gltfMat.emissiveTexture.index + texIdOffset;
-  mat.normalTexId    = gltfMat.normalTexture.index + texIdOffset;
-  mat.occlusionTexId = gltfMat.occlusionTexture.index + texIdOffset;
-  mat.metallicRoughnessTexId = gltfMat.pbrMetallicRoughness.metallicRoughnessTexture.index + texIdOffset;
+  mat.baseColorTexId = getImageId(gltfMat.pbrMetallicRoughness.baseColorTexture.index, gltfTextures, texIdOffset);
+  mat.emissionTexId  = getImageId(gltfMat.emissiveTexture.index, gltfTextures, texIdOffset);
+  mat.normalTexId    = getImageId(gltfMat.normalTexture.index, gltfTextures, texIdOffset);
+  mat.occlusionTexId = getImageId(gltfMat.occlusionTexture.index, gltfTextures, texIdOffset);
+  mat.metallicRoughnessTexId = getImageId(gltfMat.pbrMetallicRoughness.metallicRoughnessTexture.index, gltfTextures, texIdOffset);
 
   return mat;
 }

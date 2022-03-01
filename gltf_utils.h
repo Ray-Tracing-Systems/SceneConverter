@@ -26,6 +26,7 @@ struct MaterialData_pbrMR
 void getNumVerticesAndIndicesFromGLTFMesh(const tinygltf::Model &a_model, const tinygltf::Mesh &a_mesh, uint32_t& numVertices, uint32_t& numIndices);
 cmesh::SimpleMesh  simpleMeshFromGLTFMesh(const tinygltf::Model &a_model, const tinygltf::Mesh &a_mesh);
 LiteMath::float4x4 transformMatrixFromGLTFNode(const tinygltf::Node &node);
-MaterialData_pbrMR materialDataFromGLTF(const tinygltf::Material &gltfMat, int32_t texIdOffset = 0);
+MaterialData_pbrMR materialDataFromGLTF(const tinygltf::Material &gltfMat, const std::vector<tinygltf::Texture> &gltfTextures,
+                                        int32_t texIdOffset = 0);
 
 #endif// CHIMERA_GLTF_UTILS_H

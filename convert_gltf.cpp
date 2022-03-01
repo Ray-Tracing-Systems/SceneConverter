@@ -127,7 +127,7 @@ bool load_scene_gltf(const char* in_path, HRSceneInstRef scnRef)
     for(const tinygltf::Material &gltfMat : gltfModel.materials)
     {
       constexpr int32_t HAPI_TEX_ID_OFFSET = 1; //HydraAPI reserves texture id = 0 for special texture
-      MaterialData_pbrMR mat = materialDataFromGLTF(gltfMat, HAPI_TEX_ID_OFFSET);
+      MaterialData_pbrMR mat = materialDataFromGLTF(gltfMat, gltfModel.textures, HAPI_TEX_ID_OFFSET);
 //      materials.push_back(mat);
 
       auto mat_name = s2ws(gltfMat.name);
