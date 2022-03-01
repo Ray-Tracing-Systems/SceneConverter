@@ -61,7 +61,228 @@ void load_gltf_nodes_recursive(HRSceneInstRef a_scnRef, const tinygltf::Model &a
   }
 }
 
-bool load_scene_gltf(const char* in_path, HRSceneInstRef scnRef)
+void gltf_mat_to_xml(HRMaterialRef matRef, const MaterialData_pbrMR &mat, const tinygltf::Material &gltfMat)
+{
+  hrMaterialOpen(matRef, HR_WRITE_DISCARD);
+  {
+    auto matNode = hrMaterialParamNode(matRef);
+
+    // base color
+    {
+      auto base = matNode.append_child(L"base_color");
+      HydraXMLHelpers::WriteFloat4(base.append_child(L"color").append_attribute(L"val"), mat.baseColor);
+
+      if (mat.baseColorTexId > 0)
+      {
+        HRTextureNodeRef tex;
+        tex.id = mat.baseColorTexId;
+
+        hrTextureBind(tex, base.child(L"color"));
+      }
+    }
+
+    // emission
+    {
+      auto emission = matNode.append_child(L"emission");
+      HydraXMLHelpers::WriteFloat3(emission.append_child(L"color").append_attribute(L"val"), mat.emissionColor);
+
+      if (mat.emissionTexId > 0)
+      {
+        HRTextureNodeRef tex;
+        tex.id = mat.emissionTexId;
+
+        hrTextureBind(tex, emission.child(L"color"));
+      }
+    }
+
+    // metallic roughness
+    {
+      auto metallic = matNode.append_child(L"metallic");
+      HydraXMLHelpers::WriteFloat(metallic.append_attribute(L"val"), mat.metallic);
+
+      auto roughness = matNode.append_child(L"roughness");
+      HydraXMLHelpers::WriteFloat(roughness.append_attribute(L"val"), mat.roughness);
+
+      if (mat.metallicRoughnessTexId > 0)
+      {
+        HRTextureNodeRef tex;
+        tex.id = mat.metallicRoughnessTexId;
+
+        hrTextureBind(tex, metallic);
+        hrTextureBind(tex, roughness);
+      }
+    }
+
+    // opacity
+    {
+      auto opacity = matNode.append_child(L"opacity");
+      HydraXMLHelpers::WriteFloat(opacity.append_child(L"alphaCutoff").append_attribute(L"val"), mat.alphaCutoff);
+      opacity.append_child(L"alphaMode").append_attribute(L"val").set_value(gltfMat.alphaMode.c_str());
+
+      if (mat.occlusionTexId > 0)
+      {
+        HRTextureNodeRef tex;
+        tex.id = mat.occlusionTexId;
+        hrTextureBind(tex, opacity);
+      }
+    }
+
+    // normal map
+    if (mat.normalTexId > 0)
+    {
+      auto normal_map = matNode.append_child(L"normal_map");
+      HRTextureNodeRef tex;
+      tex.id = mat.normalTexId;
+      hrTextureBind(tex, normal_map);
+    }
+  }
+  hrMaterialClose(matRef);
+}
+
+void gltf_mat_to_hydra(HRMaterialRef matRef, const MaterialData_pbrMR &mat, const tinygltf::Material &gltfMat)
+{
+  hrMaterialOpen(matRef, HR_WRITE_DISCARD);
+  {
+    auto matNode = hrMaterialParamNode(matRef);
+
+    // diffuse
+    {
+      auto diffuse = matNode.append_child(L"diffuse");
+      HydraXMLHelpers::WriteFloat4(diffuse.append_child(L"color").append_attribute(L"val"), mat.baseColor);
+
+      if (mat.baseColorTexId > 0)
+      {
+        HRTextureNodeRef tex;
+        tex.id = mat.baseColorTexId;
+
+        auto texNode = hrTextureBind(tex, diffuse.child(L"color"));
+        texNode.append_attribute(L"matrix");
+        float samplerMatrix[16] = { 1, 0, 0, 0,
+                                    0, 1, 0, 0,
+                                    0, 0, 1, 0,
+                                    0, 0, 0, 1 };
+
+        texNode.append_attribute(L"addressing_mode_u").set_value(L"wrap");
+        texNode.append_attribute(L"addressing_mode_v").set_value(L"wrap");
+        texNode.append_attribute(L"input_gamma").set_value(2.2f);
+        texNode.append_attribute(L"input_alpha").set_value(L"rgb");
+
+        HydraXMLHelpers::WriteMatrix4x4(texNode, L"matrix", samplerMatrix);
+      }
+    }
+
+    // emission
+    {
+      auto emission = matNode.append_child(L"emission");
+      HydraXMLHelpers::WriteFloat3(emission.append_child(L"color").append_attribute(L"val"), mat.emissionColor);
+
+      if (mat.emissionTexId > 0)
+      {
+        HRTextureNodeRef tex;
+        tex.id = mat.emissionTexId;
+
+        auto texNode = hrTextureBind(tex, emission.child(L"color"));
+        texNode.append_attribute(L"matrix");
+        float samplerMatrix[16] = { 1, 0, 0, 0,
+                                    0, 1, 0, 0,
+                                    0, 0, 1, 0,
+                                    0, 0, 0, 1 };
+
+        texNode.append_attribute(L"addressing_mode_u").set_value(L"wrap");
+        texNode.append_attribute(L"addressing_mode_v").set_value(L"wrap");
+        texNode.append_attribute(L"input_gamma").set_value(2.2f);
+        texNode.append_attribute(L"input_alpha").set_value(L"rgb");
+
+        HydraXMLHelpers::WriteMatrix4x4(texNode, L"matrix", samplerMatrix);
+      }
+    }
+
+    // reflectivity
+    {
+      auto refl = matNode.append_child(L"reflectivity");
+      refl.append_child(L"extrusion").append_attribute(L"val").set_value(L"maxcolor");
+      HydraXMLHelpers::WriteFloat(refl.append_child(L"glossiness").append_attribute(L"val"), 1.0f - mat.roughness);
+
+      float ior = 1.0f;
+      if(mat.metallic > LiteMath::EPSILON)
+        ior = (1 + sqrtf(mat.metallic)) / (1 - sqrtf(mat.metallic));
+
+      HydraXMLHelpers::WriteFloat(refl.append_child(L"fresnel_ior").append_attribute(L"val"), ior);
+      HydraXMLHelpers::WriteFloat(refl.append_child(L"fresnel").append_attribute(L"val"), 1);
+
+      if (mat.metallicRoughnessTexId > 0)
+      {
+        HRTextureNodeRef tex;
+        tex.id = mat.metallicRoughnessTexId;
+
+        auto texNode = hrTextureBind(tex, refl.child(L"glossiness"));
+        texNode.append_attribute(L"matrix");
+        float samplerMatrix[16] = { 1, 0, 0, 0,
+                                    0, 1, 0, 0,
+                                    0, 0, 1, 0,
+                                    0, 0, 0, 1 };
+
+        texNode.append_attribute(L"addressing_mode_u").set_value(L"wrap");
+        texNode.append_attribute(L"addressing_mode_v").set_value(L"wrap");
+        texNode.append_attribute(L"input_gamma").set_value(2.2f);
+        texNode.append_attribute(L"input_alpha").set_value(L"rgb");
+
+        HydraXMLHelpers::WriteMatrix4x4(texNode, L"matrix", samplerMatrix);
+      }
+    }
+
+    // opacity
+    {
+      auto opacity = matNode.append_child(L"opacity");
+//      HydraXMLHelpers::WriteFloat(opacity.append_child(L"alphaCutoff").append_attribute(L"val"), mat.alphaCutoff);
+//      opacity.append_child(L"alphaMode").append_attribute(L"val").set_value(gltfMat.alphaMode.c_str());
+
+      if (mat.occlusionTexId > 0)
+      {
+        HRTextureNodeRef tex;
+        tex.id = mat.occlusionTexId;
+        auto texNode = hrTextureBind(tex, opacity);
+        texNode.append_attribute(L"matrix");
+        float samplerMatrix[16] = { 1, 0, 0, 0,
+                                    0, 1, 0, 0,
+                                    0, 0, 1, 0,
+                                    0, 0, 0, 1 };
+
+        texNode.append_attribute(L"addressing_mode_u").set_value(L"wrap");
+        texNode.append_attribute(L"addressing_mode_v").set_value(L"wrap");
+        texNode.append_attribute(L"input_gamma").set_value(2.2f);
+        texNode.append_attribute(L"input_alpha").set_value(L"rgb");
+
+        HydraXMLHelpers::WriteMatrix4x4(texNode, L"matrix", samplerMatrix);
+      }
+    }
+
+    // normal map
+    if (mat.normalTexId > 0)
+    {
+      auto displ = matNode.append_child(L"displacement");
+      displ.append_attribute(L"type").set_value(L"normal_bump");
+      HRTextureNodeRef tex;
+      tex.id = mat.normalTexId;
+      auto texNode = hrTextureBind(tex, displ.append_child(L"normal_map"));
+      texNode.append_attribute(L"matrix");
+      float samplerMatrix[16] = { 1, 0, 0, 0,
+                                  0, 1, 0, 0,
+                                  0, 0, 1, 0,
+                                  0, 0, 0, 1 };
+
+      texNode.append_attribute(L"addressing_mode_u").set_value(L"wrap");
+      texNode.append_attribute(L"addressing_mode_v").set_value(L"wrap");
+      texNode.append_attribute(L"input_gamma").set_value(2.2f);
+      texNode.append_attribute(L"input_alpha").set_value(L"rgb");
+
+      HydraXMLHelpers::WriteMatrix4x4(texNode, L"matrix", samplerMatrix);
+    }
+  }
+  hrMaterialClose(matRef);
+}
+
+bool load_scene_gltf(const char* in_path, HRSceneInstRef scnRef, bool convert_materials)
 {
   std::string scenePath(in_path);
   tinygltf::Model gltfModel;
@@ -132,80 +353,10 @@ bool load_scene_gltf(const char* in_path, HRSceneInstRef scnRef)
 
       auto mat_name = s2ws(gltfMat.name);
       HRMaterialRef matRef = hrMaterialCreate(mat_name.c_str());
-      hrMaterialOpen(matRef, HR_WRITE_DISCARD);
-      {
-        auto matNode = hrMaterialParamNode(matRef);
-
-        // base color
-        {
-          auto base = matNode.append_child(L"base_color");
-          HydraXMLHelpers::WriteFloat4(base.append_child(L"color").append_attribute(L"val"), mat.baseColor);
-
-          if (mat.baseColorTexId > 0)
-          {
-            HRTextureNodeRef tex;
-            tex.id = mat.baseColorTexId;
-
-            hrTextureBind(tex, base.child(L"color"));
-          }
-        }
-
-        // emission
-        {
-          auto emission = matNode.append_child(L"emission");
-          HydraXMLHelpers::WriteFloat3(emission.append_child(L"color").append_attribute(L"val"), mat.emissionColor);
-
-          if (mat.emissionTexId > 0)
-          {
-            HRTextureNodeRef tex;
-            tex.id = mat.emissionTexId;
-
-            hrTextureBind(tex, emission.child(L"color"));
-          }
-        }
-
-        // metallic roughness
-        {
-          auto metallic = matNode.append_child(L"metallic");
-          HydraXMLHelpers::WriteFloat(metallic.append_attribute(L"val"), mat.metallic);
-
-          auto roughness = matNode.append_child(L"roughness");
-          HydraXMLHelpers::WriteFloat(roughness.append_attribute(L"val"), mat.roughness);
-
-          if (mat.metallicRoughnessTexId > 0)
-          {
-            HRTextureNodeRef tex;
-            tex.id = mat.metallicRoughnessTexId;
-
-            hrTextureBind(tex, metallic);
-            hrTextureBind(tex, roughness);
-          }
-        }
-
-        // opacity
-        {
-          auto opacity = matNode.append_child(L"opacity");
-          HydraXMLHelpers::WriteFloat(opacity.append_child(L"alphaCutoff").append_attribute(L"val"), mat.alphaCutoff);
-          opacity.append_child(L"alphaMode").append_attribute(L"val").set_value(gltfMat.alphaMode.c_str());
-
-          if (mat.occlusionTexId > 0)
-          {
-            HRTextureNodeRef tex;
-            tex.id = mat.occlusionTexId;
-            hrTextureBind(tex, opacity);
-          }
-        }
-
-        // normal map
-        if (mat.normalTexId > 0)
-        {
-          auto normal_map = matNode.append_child(L"normal_map");
-          HRTextureNodeRef tex;
-          tex.id = mat.normalTexId;
-          hrTextureBind(tex, normal_map);
-        }
-      }
-      hrMaterialClose(matRef);
+      if(convert_materials)
+        gltf_mat_to_hydra(matRef, mat, gltfMat);
+      else
+        gltf_mat_to_xml(matRef, mat, gltfMat);
 
       std::cout << "Loading materials # " << matRef.id << "\r";
     }
@@ -286,7 +437,7 @@ HRRenderRef add_default_render(int32_t a_deviceId)
 }
 
 
-bool convert_gltf_to_hydra(const char* src_path, const char* dest_path)
+bool convert_gltf_to_hydra(const char* src_path, const char* dest_path, bool convert_materials)
 {
   hrErrorCallerPlace(L"convert_gltf_to_hydra");
 
@@ -298,7 +449,7 @@ bool convert_gltf_to_hydra(const char* src_path, const char* dest_path)
 
   HRSceneInstRef scnRef = hrSceneCreate(L"exported_scene");
 
-  load_scene_gltf(src_path, scnRef);
+  load_scene_gltf(src_path, scnRef, convert_materials);
 
   add_default_light(scnRef);
   auto camRef    = add_default_camera();
