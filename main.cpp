@@ -15,7 +15,7 @@ int main(int argc, char* argv[])
   std::string gltf_path(argv[1]);
   std::string out_path(argv[2]);
   
-  auto res = convert_gltf_to_hydra(gltf_path.c_str(), out_path.c_str(), false);
+  auto res = convert_gltf_to_hydra(gltf_path.c_str(), out_path.c_str(), true);
 
   return !res;
 }

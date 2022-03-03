@@ -16,13 +16,12 @@ set(HYDRA_API_UTILS_SRC_DIR ${HYDRA_API_ROOT_DIR}/utils)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules")
 
 if(WIN32)
-  link_directories(${ADDITIONAL_LIBRARY_DIRS})
+  include_directories(${HYDRA_API_ROOT_DIR}/dependencies/include)
+  link_directories(${HYDRA_API_ROOT_DIR}/dependencies/lib_x64_win)
 else()
   find_package(glfw3 REQUIRED)
   include_directories(${GLFW_INCLUDE_DIRS})
   set(LIBS ${LIBS} ${GLFW_LIBRARIES})
-#  find_package(FreeImage REQUIRED)
-#  include_directories(${FREEIMAGE_INCLUDE_DIRS})
   find_package (Threads REQUIRED)
   set(THREADS_PREFER_PTHREAD_FLAG ON)
 endif()
@@ -48,10 +47,14 @@ find_library(HYDRA_API_LIB hydra_api HINTS ${HYDRA_API_LIB_DIR} NO_DEFAULT_PATH)
 find_library(HYDRA_API_IES_PARSER_LIB ies_parser HINTS ${HYDRA_API_LIB_DIR} NO_DEFAULT_PATH)
 find_library(HYDRA_API_MIKKTSPACE mikktspace HINTS ${HYDRA_API_LIB_DIR} NO_DEFAULT_PATH)
 find_library(HYDRA_API_CORTO corto HINTS ${HYDRA_API_LIB_DIR} NO_DEFAULT_PATH)
+find_library(HYDRA_API_CLEW clew HINTS ${HYDRA_API_LIB_DIR} NO_DEFAULT_PATH)
 
 
 if(WIN32)
-  target_link_libraries(scene-converter PUBLIC ${OPENGL_gl_LIBRARY} ${LIBS} hydra_api)
+  target_link_libraries(scene-converter PUBLIC
+          ${HYDRA_API_LIB}
+          ${HYDRA_API_IES_PARSER_LIB} ${HYDRA_API_MIKKTSPACE} ${HYDRA_API_CORTO} ${HYDRA_API_CLEW}
+          ${OPENGL_gl_LIBRARY} ${LIBS} glfw3dll)
 else()
   target_link_libraries(scene-converter LINK_PUBLIC
           ${HYDRA_API_LIB}

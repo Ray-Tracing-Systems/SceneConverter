@@ -23,6 +23,7 @@ if (WIN32)
 			$ENV{PROGRAMFILES}/include
 			${FREEIMAGE_ROOT_DIR}/include
 			${CMAKE_SOURCE_DIR}/dependencies/include
+			${CMAKE_SOURCE_DIR}/../HydraAPI/dependencies/include
 		DOC "The directory where FreeImage.h resides")
 
 	# Find library files
@@ -32,7 +33,9 @@ if (WIN32)
 		PATHS
 			$ENV{PROGRAMFILES}/lib
 			${FREEIMAGE_ROOT_DIR}/lib
-			${CMAKE_SOURCE_DIR}/dependencies/lib_x64)
+			${CMAKE_SOURCE_DIR}/dependencies/lib_x64
+			${CMAKE_SOURCE_DIR}/../HydraAPI/dependencies/lib_x64_win
+	)
 else()
 	# Find include files
 	find_path(
