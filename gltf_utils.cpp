@@ -1,5 +1,6 @@
 #include "gltf_utils.h"
 #include "convert_gltf.h"
+#include "convert_common.h"
 #include <iostream>
 
 LiteMath::float4x4 rotMatrixFromQuaternion(const LiteMath::float4 &q)

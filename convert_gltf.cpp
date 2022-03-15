@@ -9,6 +9,7 @@
 #define TINYGLTF_NOEXCEPTION
 #define TINYGLTF_USE_CPP14
 
+#include "convert_common.h"
 #include "convert_gltf.h"
 #include "gltf_utils.h"
 #include "image_loader.h"
@@ -282,25 +283,18 @@ void gltf_mat_to_hydra(HRMaterialRef matRef, const MaterialData_pbrMR &mat, cons
   hrMaterialClose(matRef);
 }
 
-bool load_scene_gltf(const char* in_path, HRSceneInstRef scnRef, bool convert_materials)
+bool load_scene_gltf(const std::filesystem::path& in_path, HRSceneInstRef scnRef, bool convert_materials)
 {
-  std::string scenePath(in_path);
   tinygltf::Model gltfModel;
   tinygltf::TinyGLTF gltfContext;
   std::string error, warning;
 
-  std::string sceneFolder;
-  auto found = scenePath.find_last_of('/');
-  if(found != std::string::npos && found != scenePath.size())
-    sceneFolder = scenePath.substr(0, found + 1);
-  else
-    sceneFolder = "./";
 
-  bool loaded = gltfContext.LoadASCIIFromFile(&gltfModel, &error, &warning, scenePath);
+  bool loaded = gltfContext.LoadASCIIFromFile(&gltfModel, &error, &warning, in_path.string());
 
   if(!loaded)
   {
-    std::cout << "Cannot load glTF scene from: " << scenePath;
+    std::cout << "Cannot load glTF scene from: " << in_path;
     return false;
   }
 
@@ -326,15 +320,15 @@ bool load_scene_gltf(const char* in_path, HRSceneInstRef scnRef, bool convert_ma
 //    textureInfos.reserve(gltfModel.materials.size() * 4);
     for (tinygltf::Image &image : gltfModel.images)
     {
-      auto texturePath      = sceneFolder + image.uri;
-      ImageFileInfo texInfo = getImageInfo(texturePath);
+      std::filesystem::path texturePath = in_path.parent_path();
+      texturePath.append(image.uri);
+      ImageFileInfo texInfo = getImageInfo(texturePath.string());
       if(!texInfo.is_ok)
       {
         std::cout << "Texture at \"" << texturePath << "\" is absent or corrupted." ;
       }
-//      textureInfos.push_back(texInfo);
-      auto texturePath_w = s2ws(texturePath);
-      auto tex_ref = hrTexture2DCreateFromFile(texturePath_w.c_str());
+
+      auto tex_ref = hrTexture2DCreateFromFile(texturePath.wstring().c_str());
 
       std::cout << "Loading textures # " << tex_ref.id << "\r";
     }
@@ -377,86 +371,14 @@ bool load_scene_gltf(const char* in_path, HRSceneInstRef scnRef, bool convert_ma
   return true;
 }
 
-void add_default_light(HRSceneInstRef scnRef)
-{
-  HRLightRef sky = hrLightCreate(L"sky");
 
-  hrLightOpen(sky, HR_WRITE_DISCARD);
-  {
-    auto lightNode = hrLightParamNode(sky);
-
-    lightNode.attribute(L"type").set_value(L"sky");
-
-    auto intensityNode = lightNode.append_child(L"intensity");
-
-    intensityNode.append_child(L"color").append_attribute(L"val").set_value(L"0.75 0.75 1");
-    intensityNode.append_child(L"multiplier").append_attribute(L"val").set_value(1.0f);
-  }
-  hrLightClose(sky);
-
-  LiteMath::float4x4 mat;
-  hrLightInstance(scnRef, sky, mat.L());
-}
-
-HRCameraRef add_default_camera()
-{
-  HRCameraRef camRef = hrCameraCreate(L"my camera");
-
-  hrCameraOpen(camRef, HR_WRITE_DISCARD);
-  {
-    auto camNode = hrCameraParamNode(camRef);
-
-    camNode.append_child(L"fov").text().set(L"45");
-    camNode.append_child(L"nearClipPlane").text().set(L"0.01");
-    camNode.append_child(L"farClipPlane").text().set(L"100.0");
-
-    camNode.append_child(L"up").text().set(L"0 1 0");
-    camNode.append_child(L"position").text().set(L"0 0 10");
-    camNode.append_child(L"look_at").text().set(L"0 0 0");
-  }
-  hrCameraClose(camRef);
-
-  return camRef;
-}
-
-HRRenderRef add_default_render(int32_t a_deviceId)
-{
-  HRRenderRef renderRef = hrRenderCreate(L"HydraModern");
-  hrRenderEnableDevice(renderRef, a_deviceId, true);
-
-  hrRenderOpen(renderRef, HR_WRITE_DISCARD);
-  {
-    auto node = hrRenderParamNode(renderRef);
-
-    node.append_child(L"width").text()  = 1024;
-    node.append_child(L"height").text() = 1024;
-
-    node.append_child(L"method_primary").text()   = L"pathtracing";
-    node.append_child(L"method_secondary").text() = L"pathtracing";
-    node.append_child(L"method_tertiary").text()  = L"pathtracing";
-    node.append_child(L"method_caustic").text()   = L"pathtracing";
-
-    node.append_child(L"trace_depth").text()      = 6;
-    node.append_child(L"diff_trace_depth").text() = 3;
-    node.append_child(L"maxRaysPerPixel").text()  = 512;
-    node.append_child(L"resources_path").text()   = L"..";
-    node.append_child(L"offline_pt").text()       = 0;
-  }
-  hrRenderClose(renderRef);
-
-  return renderRef;
-}
-
-
-bool convert_gltf_to_hydra(const char* src_path, const char* dest_path, bool convert_materials)
+bool convert_gltf_to_hydra(const std::filesystem::path& src_path, const std::filesystem::path& dest_path, bool convert_materials)
 {
   hrErrorCallerPlace(L"convert_gltf_to_hydra");
 
-  std::string out(dest_path);
-  auto hydra_out = s2ws(out);
-  hr_fs::mkdir(dest_path);
+  std::filesystem::create_directories(dest_path);
 
-  hrSceneLibraryOpen(hydra_out.c_str(), HR_WRITE_DISCARD);
+  hrSceneLibraryOpen(dest_path.wstring().c_str(), HR_WRITE_DISCARD);
 
   HRSceneInstRef scnRef = hrSceneCreate(L"exported_scene");
 

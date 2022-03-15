@@ -32,7 +32,9 @@ include_directories(${FREEIMAGE_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${FREEIMAGE_LIBRARIES})
 
 set(SOURCE_FILES
+        convert_common.cpp
         convert_gltf.cpp
+        convert_obj.cpp
         image_loader.cpp
         gltf_utils.cpp
         main.cpp)
