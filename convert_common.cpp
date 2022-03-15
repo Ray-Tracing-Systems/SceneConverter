@@ -1,6 +1,11 @@
 #include "convert_common.h"
 #include "LiteMath.h"
+#include "HydraAPI.h"
+#include "cmesh.h"
+
 #include <filesystem>
+#include <iostream>
+#include <cassert>
 
 SCENE_TYPE guessSceneTypeFromExt(const std::filesystem::path& scenePath)
 {
@@ -15,6 +20,27 @@ SCENE_TYPE guessSceneTypeFromExt(const std::filesystem::path& scenePath)
     return SCENE_TYPE::SCENE_GLTF;
   else
     return SCENE_TYPE::SCENE_UNKNOWN;
+}
+
+bool copyExportedMesh(const std::filesystem::path& sceneLib, const std::filesystem::path& outDir, const std::filesystem::path& meshName)
+{
+  std::filesystem::path meshPath = sceneLib;
+  meshPath.append("data");
+  meshPath.append("chunk_00001.vsgf");
+
+  if (!std::filesystem::exists(meshPath))
+  {
+    std::cout << "Unknown ERROR! Can't find converted mesh at " << meshPath << std::endl;
+    return false;
+  }
+
+  std::filesystem::path resPath = outDir;
+  resPath.append(meshName.native());
+
+  std::filesystem::copy_file(meshPath, resPath);
+  std::filesystem::remove_all(sceneLib);
+
+  return true;
 }
 
 void add_default_light(HRSceneInstRef scnRef)
@@ -85,4 +111,60 @@ HRRenderRef add_default_render(int32_t a_deviceId)
   hrRenderClose(renderRef);
 
   return renderRef;
+}
+
+cmesh::SimpleMesh transformSimpleMesh(const cmesh::SimpleMesh& mesh, const LiteMath::float4x4& matrix)
+{
+  cmesh::SimpleMesh transformed = mesh;
+
+  auto normalMatrix = LiteMath::transpose(LiteMath::inverse4x4(matrix));
+  normalMatrix.set_col(3, LiteMath::float4());
+  normalMatrix.set_row(3, LiteMath::float4());
+
+  bool hasTang = !transformed.vTang4f.empty();
+
+  for (size_t i = 0; i < transformed.VerticesNum(); ++i)
+  {
+    LiteMath::float4& vertex = (LiteMath::float4& )transformed.vPos4f[i * 4 + 0];
+    vertex = matrix * vertex;
+    vertex.w = 1.0f;
+
+    LiteMath::float4& normal = (LiteMath::float4&)transformed.vNorm4f[i * 4 + 0];   
+    normal = LiteMath::normalize3(normalMatrix * normal);
+    normal.w = 1.0f;
+
+    if (hasTang)
+    {
+      LiteMath::float4& tangent = (LiteMath::float4&)transformed.vTang4f[i * 4 + 0];
+      tangent = LiteMath::normalize3(normalMatrix * tangent);
+      tangent.w = 1.0f;
+    }
+  }
+
+  return transformed;
+}
+
+void mergeMeshIntoMesh(cmesh::SimpleMesh& meshTo, const cmesh::SimpleMesh& meshFrom)
+{
+  assert(meshTo.topology == meshFrom.topology);
+
+  auto oldVertNum = meshTo.VerticesNum();
+  auto oldIdxNum  = meshTo.IndicesNum();
+  auto oldTriNum  = meshTo.IndicesNum() / meshTo.PolySize();
+
+  meshTo.Resize(oldVertNum + meshFrom.VerticesNum(), oldIdxNum + meshFrom.IndicesNum());
+
+  memcpy(&meshTo.vPos4f[oldVertNum * 4],      meshFrom.vPos4f.data(),      sizeof(meshFrom.vPos4f[0]) * meshFrom.vPos4f.size());
+  memcpy(&meshTo.vNorm4f[oldVertNum * 4],     meshFrom.vNorm4f.data(),     sizeof(meshFrom.vNorm4f[0]) * meshFrom.vNorm4f.size());
+  memcpy(&meshTo.vTang4f[oldVertNum * 4],     meshFrom.vTang4f.data(),     sizeof(meshFrom.vTang4f[0]) * meshFrom.vTang4f.size());
+  memcpy(&meshTo.vTexCoord2f[oldVertNum * 2], meshFrom.vTexCoord2f.data(), sizeof(meshFrom.vTexCoord2f[0]) * meshFrom.vTexCoord2f.size());
+
+  memcpy(&meshTo.matIndices[oldTriNum], meshFrom.matIndices.data(), sizeof(meshFrom.matIndices[0]) * meshFrom.matIndices.size());
+  memcpy(&meshTo.indices[oldIdxNum], meshFrom.indices.data(), sizeof(meshFrom.indices[0]) * meshFrom.indices.size());
+
+  for (size_t i = oldIdxNum; i < meshTo.IndicesNum(); ++i)
+  {
+    meshTo.indices[i] += oldVertNum;
+  }
+
 }

@@ -62,6 +62,31 @@ void load_gltf_nodes_recursive(HRSceneInstRef a_scnRef, const tinygltf::Model &a
   }
 }
 
+void collapse_gltf_nodes_recursive(cmesh::SimpleMesh& outMesh, const tinygltf::Model& a_model, const tinygltf::Node& a_node, const LiteMath::float4x4& a_parentMatrix,
+  std::unordered_map<int, cmesh::SimpleMesh>& a_idToSimpleMesh, uint32_t &idx)
+{
+  auto nodeMatrix = a_parentMatrix * transformMatrixFromGLTFNode(a_node);
+
+  for (size_t i = 0; i < a_node.children.size(); i++)
+  {
+    collapse_gltf_nodes_recursive(outMesh, a_model, a_model.nodes[a_node.children[i]], nodeMatrix, a_idToSimpleMesh, idx);
+  }
+
+  if (a_node.mesh > -1)
+  {
+    if (!a_idToSimpleMesh.count(a_node.mesh))
+    {
+      const tinygltf::Mesh mesh = a_model.meshes[a_node.mesh];
+      a_idToSimpleMesh[a_node.mesh] = simpleMeshFromGLTFMesh(a_model, mesh);
+    }
+    
+    std::cout << "Merging part # " << idx << "\r";
+    mergeMeshIntoMesh(outMesh, transformSimpleMesh(a_idToSimpleMesh[a_node.mesh], nodeMatrix));
+
+    idx++;
+  }
+}
+
 void gltf_mat_to_xml(HRMaterialRef matRef, const MaterialData_pbrMR &mat, const tinygltf::Material &gltfMat)
 {
   hrMaterialOpen(matRef, HR_WRITE_DISCARD);
@@ -283,12 +308,11 @@ void gltf_mat_to_hydra(HRMaterialRef matRef, const MaterialData_pbrMR &mat, cons
   hrMaterialClose(matRef);
 }
 
-bool load_scene_gltf(const std::filesystem::path& in_path, HRSceneInstRef scnRef, bool convert_materials)
+bool load_scene_gltf(const std::filesystem::path& in_path, HRSceneInstRef scnRef, bool export_single_mesh, bool convert_materials)
 {
   tinygltf::Model gltfModel;
   tinygltf::TinyGLTF gltfContext;
   std::string error, warning;
-
 
   bool loaded = gltfContext.LoadASCIIFromFile(&gltfModel, &error, &warning, in_path.string());
 
@@ -301,31 +325,65 @@ bool load_scene_gltf(const std::filesystem::path& in_path, HRSceneInstRef scnRef
   const tinygltf::Scene& scene = gltfModel.scenes[0];
 
   // geometry and instancing
-  {
-    hrSceneOpen(scnRef, HR_WRITE_DISCARD);
+  
+  hrSceneOpen(scnRef, HR_WRITE_DISCARD);
 
-    std::unordered_map<int, HRMeshRef> loaded_meshes_to_meshId;
-    for(size_t i = 0; i < scene.nodes.size(); ++i)
+  if (export_single_mesh)
+  {
+    cmesh::SimpleMesh outMesh;
+    auto identity = LiteMath::float4x4();
+    std::unordered_map<int, cmesh::SimpleMesh> idToSimpleMesh; 
+    uint32_t mesh_idx = 0;
+    for (size_t i = 0; i < scene.nodes.size(); ++i)
     {
       const tinygltf::Node node = gltfModel.nodes[scene.nodes[i]];
-      auto identity = LiteMath::float4x4();
+      collapse_gltf_nodes_recursive(outMesh, gltfModel, node, identity, idToSimpleMesh, mesh_idx);
+    }
+    std::cout << std::endl;
+
+    if (outMesh.VerticesNum() > 0)
+    {
+
+      HRMeshRef meshRef = hrMeshCreate(L"collapsed_mesh");
+      hrMeshOpen(meshRef, HR_TRIANGLE_IND3, HR_WRITE_DISCARD);
+      {
+        hrMeshVertexAttribPointer4f(meshRef, L"pos", outMesh.vPos4f.data());
+        hrMeshVertexAttribPointer4f(meshRef, L"norm", outMesh.vNorm4f.data());
+        hrMeshVertexAttribPointer2f(meshRef, L"texcoord", outMesh.vTexCoord2f.data());
+
+        const int* mat_ind = (const int*)(outMesh.matIndices.data());
+        hrMeshPrimitiveAttribPointer1i(meshRef, L"mind", mat_ind);
+
+        const int* ind = (const int*)(outMesh.indices.data());
+        hrMeshAppendTriangles3(meshRef, int(outMesh.indices.size()), ind);
+      }
+      hrMeshClose(meshRef);
+
+      hrMeshInstance(scnRef, meshRef, identity.L());
+    }
+  }
+  else
+  {
+    std::unordered_map<int, HRMeshRef> loaded_meshes_to_meshId;
+    const auto identity = LiteMath::float4x4();
+    for (size_t i = 0; i < scene.nodes.size(); ++i)
+    {
+      const tinygltf::Node node = gltfModel.nodes[scene.nodes[i]];
       load_gltf_nodes_recursive(scnRef, gltfModel, node, identity, loaded_meshes_to_meshId);
     }
     std::cout << std::endl;
   }
 
   // textures
-//  std::vector<ImageFileInfo> textureInfos;
   {
-//    textureInfos.reserve(gltfModel.materials.size() * 4);
-    for (tinygltf::Image &image : gltfModel.images)
+    for (tinygltf::Image& image : gltfModel.images)
     {
       std::filesystem::path texturePath = in_path.parent_path();
       texturePath.append(image.uri);
       ImageFileInfo texInfo = getImageInfo(texturePath.string());
-      if(!texInfo.is_ok)
+      if (!texInfo.is_ok)
       {
-        std::cout << "Texture at \"" << texturePath << "\" is absent or corrupted." ;
+        std::cout << "Texture at \"" << texturePath << "\" is absent or corrupted.";
       }
 
       auto tex_ref = hrTexture2DCreateFromFile(texturePath.wstring().c_str());
@@ -336,9 +394,7 @@ bool load_scene_gltf(const std::filesystem::path& in_path, HRSceneInstRef scnRef
   }
 
   // materials
-//  std::vector<MaterialData_pbrMR> materials;
   {
-//    materials.reserve(gltfModel.materials.size());
     {
       HRMaterialRef matRef = hrMaterialCreate(L"No material");
       hrMaterialOpen(matRef, HR_WRITE_DISCARD);
@@ -351,14 +407,13 @@ bool load_scene_gltf(const std::filesystem::path& in_path, HRSceneInstRef scnRef
       hrMaterialClose(matRef);
     }
 
-    for(const tinygltf::Material &gltfMat : gltfModel.materials)
+    for (const tinygltf::Material& gltfMat : gltfModel.materials)
     {
       MaterialData_pbrMR mat = materialDataFromGLTF(gltfMat, gltfModel.textures, HAPI_TEX_ID_OFFSET);
-//      materials.push_back(mat);
 
       auto mat_name = s2ws(gltfMat.name);
       HRMaterialRef matRef = hrMaterialCreate(mat_name.c_str());
-      if(convert_materials)
+      if (convert_materials)
         gltf_mat_to_hydra(matRef, mat, gltfMat);
       else
         gltf_mat_to_xml(matRef, mat, gltfMat);
@@ -367,12 +422,14 @@ bool load_scene_gltf(const std::filesystem::path& in_path, HRSceneInstRef scnRef
     }
     std::cout << std::endl;
   }
+  
 
   return true;
 }
 
 
-bool convert_gltf_to_hydra(const std::filesystem::path& src_path, const std::filesystem::path& dest_path, bool convert_materials)
+bool convert_gltf_to_hydra(const std::filesystem::path& src_path, const std::filesystem::path& dest_path,
+  bool export_single_mesh, bool convert_materials)
 {
   hrErrorCallerPlace(L"convert_gltf_to_hydra");
 
@@ -382,7 +439,7 @@ bool convert_gltf_to_hydra(const std::filesystem::path& src_path, const std::fil
 
   HRSceneInstRef scnRef = hrSceneCreate(L"exported_scene");
 
-  load_scene_gltf(src_path, scnRef, convert_materials);
+  load_scene_gltf(src_path, scnRef, export_single_mesh, convert_materials);
 
   add_default_light(scnRef);
   auto camRef    = add_default_camera();
