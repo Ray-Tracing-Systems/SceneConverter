@@ -20,6 +20,8 @@ SCENE_TYPE guessSceneTypeFromExt(const std::filesystem::path& scenePath);
 bool copyExportedMesh(const std::filesystem::path& sceneLib, const std::filesystem::path& outDir,
   const std::filesystem::path& meshName);
 
+void saveMesh(HRMeshRef meshRef, const std::filesystem::path& outDir, const std::filesystem::path& meshName);
+
 cmesh::SimpleMesh transformSimpleMesh(const cmesh::SimpleMesh& mesh, const LiteMath::float4x4& matrix);
 void mergeMeshIntoMesh(cmesh::SimpleMesh& meshTo, const cmesh::SimpleMesh& meshFrom);
 

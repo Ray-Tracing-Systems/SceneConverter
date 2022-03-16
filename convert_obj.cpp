@@ -9,13 +9,15 @@
 #include "HydraXMLHelpers.h"
 
 
-bool convert_obj_to_hydra(const std::filesystem::path& src_path, const std::filesystem::path& dest_path, bool)
+bool convert_obj_to_hydra(const std::filesystem::path& src_path, const std::filesystem::path& dest_path, bool export_single_mesh)
 {
   hrErrorCallerPlace(L"convert_obj_to_hydra");
 
-  std::filesystem::create_directories(dest_path);
+  auto sceneLib = dest_path;
+  sceneLib.append("scenelib");
+  std::filesystem::create_directories(sceneLib);
 
-  hrSceneLibraryOpen(dest_path.wstring().c_str(), HR_WRITE_DISCARD);
+  hrSceneLibraryOpen(sceneLib.wstring().c_str(), HR_WRITE_DISCARD);
 
   HRModelLoadInfo loadInfo{};
   loadInfo.useMaterial = true;
@@ -23,6 +25,11 @@ bool convert_obj_to_hydra(const std::filesystem::path& src_path, const std::file
 
   std::wstring pathW = src_path.wstring();
   auto objMesh = hrMeshCreateFromFile(pathW.c_str(), loadInfo);
+
+  if (export_single_mesh)
+  {
+    saveMesh(objMesh, dest_path, src_path.stem());
+  }
 
   HRSceneInstRef scnRef = hrSceneCreate(L"exported_scene");
 

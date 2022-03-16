@@ -17,8 +17,7 @@ int main(int argc, char* argv[])
 
   std::filesystem::path in_path(argv[1]);
   std::filesystem::path out_path(argv[2]);
-  std::filesystem::path mesh_name = "exportedMesh.vsgf";
-  bool collapse_to_single_mesh = false;
+  bool collapse_to_single_mesh = true;
   
   if (!std::filesystem::exists(in_path))
   {
@@ -27,20 +26,14 @@ int main(int argc, char* argv[])
   }
 
 
-  std::filesystem::path sceneLibPath = out_path;
-  if (collapse_to_single_mesh)
-  {
-    sceneLibPath.append("tmp");
-  }
-
   bool result = true;
   switch (guessSceneTypeFromExt(in_path))
   {
   case SCENE_TYPE::SCENE_GLTF:
-    result = convert_gltf_to_hydra(in_path, sceneLibPath, collapse_to_single_mesh, true);
+    result = convert_gltf_to_hydra(in_path, out_path, collapse_to_single_mesh, true);
     break;
   case SCENE_TYPE::SCENE_OBJ:
-    result = convert_obj_to_hydra(in_path, sceneLibPath, collapse_to_single_mesh);
+    result = convert_obj_to_hydra(in_path, out_path, collapse_to_single_mesh);
     break;
   case SCENE_TYPE::SCENE_UNKNOWN:
     result = false;
@@ -51,13 +44,6 @@ int main(int argc, char* argv[])
     break;
   }
 
-  if (result)
-  {
-    if (collapse_to_single_mesh)
-    {
-     // result = copyExportedMesh(sceneLibPath, out_path, mesh_name);
-    }
-  }
 
   if (!result)
     return 1;

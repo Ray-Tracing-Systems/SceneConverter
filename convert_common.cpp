@@ -43,6 +43,22 @@ bool copyExportedMesh(const std::filesystem::path& sceneLib, const std::filesyst
   return true;
 }
 
+void saveMesh(HRMeshRef meshRef, const std::filesystem::path& outDir, const std::filesystem::path& meshName)
+{
+  std::filesystem::path actualMeshPath = outDir;
+  std::filesystem::path ext(".vsgf2");
+  if (meshName.extension() != ext)
+  {
+    actualMeshPath.append(meshName.filename().native());
+    actualMeshPath.replace_extension(ext.native());
+  }
+  else
+  {
+    actualMeshPath.replace_extension(meshName.native());
+  }
+  hrMeshSaveVSGF(meshRef, actualMeshPath.wstring().c_str());
+}
+
 void add_default_light(HRSceneInstRef scnRef)
 {
   HRLightRef sky = hrLightCreate(L"sky");

@@ -308,7 +308,8 @@ void gltf_mat_to_hydra(HRMaterialRef matRef, const MaterialData_pbrMR &mat, cons
   hrMaterialClose(matRef);
 }
 
-bool load_scene_gltf(const std::filesystem::path& in_path, HRSceneInstRef scnRef, bool export_single_mesh, bool convert_materials)
+bool load_scene_gltf(const std::filesystem::path& in_path, const std::filesystem::path& dest_path, HRSceneInstRef scnRef,
+  bool export_single_mesh, bool convert_materials)
 {
   tinygltf::Model gltfModel;
   tinygltf::TinyGLTF gltfContext;
@@ -325,6 +326,7 @@ bool load_scene_gltf(const std::filesystem::path& in_path, HRSceneInstRef scnRef
   const tinygltf::Scene& scene = gltfModel.scenes[0];
 
   // geometry and instancing
+  HRMeshRef singleMesh;
   
   hrSceneOpen(scnRef, HR_WRITE_DISCARD);
 
@@ -344,22 +346,22 @@ bool load_scene_gltf(const std::filesystem::path& in_path, HRSceneInstRef scnRef
     if (outMesh.VerticesNum() > 0)
     {
 
-      HRMeshRef meshRef = hrMeshCreate(L"collapsed_mesh");
-      hrMeshOpen(meshRef, HR_TRIANGLE_IND3, HR_WRITE_DISCARD);
+      singleMesh = hrMeshCreate(L"collapsed_mesh");
+      hrMeshOpen(singleMesh, HR_TRIANGLE_IND3, HR_WRITE_DISCARD);
       {
-        hrMeshVertexAttribPointer4f(meshRef, L"pos", outMesh.vPos4f.data());
-        hrMeshVertexAttribPointer4f(meshRef, L"norm", outMesh.vNorm4f.data());
-        hrMeshVertexAttribPointer2f(meshRef, L"texcoord", outMesh.vTexCoord2f.data());
+        hrMeshVertexAttribPointer4f(singleMesh, L"pos", outMesh.vPos4f.data());
+        hrMeshVertexAttribPointer4f(singleMesh, L"norm", outMesh.vNorm4f.data());
+        hrMeshVertexAttribPointer2f(singleMesh, L"texcoord", outMesh.vTexCoord2f.data());
 
         const int* mat_ind = (const int*)(outMesh.matIndices.data());
-        hrMeshPrimitiveAttribPointer1i(meshRef, L"mind", mat_ind);
+        hrMeshPrimitiveAttribPointer1i(singleMesh, L"mind", mat_ind);
 
         const int* ind = (const int*)(outMesh.indices.data());
-        hrMeshAppendTriangles3(meshRef, int(outMesh.indices.size()), ind);
+        hrMeshAppendTriangles3(singleMesh, int(outMesh.indices.size()), ind);
       }
-      hrMeshClose(meshRef);
+      hrMeshClose(singleMesh);
 
-      hrMeshInstance(scnRef, meshRef, identity.L());
+      hrMeshInstance(scnRef, singleMesh, identity.L());
     }
   }
   else
@@ -422,6 +424,9 @@ bool load_scene_gltf(const std::filesystem::path& in_path, HRSceneInstRef scnRef
     }
     std::cout << std::endl;
   }
+
+  if(export_single_mesh)
+    saveMesh(singleMesh, dest_path, in_path.stem());
   
 
   return true;
@@ -433,13 +438,15 @@ bool convert_gltf_to_hydra(const std::filesystem::path& src_path, const std::fil
 {
   hrErrorCallerPlace(L"convert_gltf_to_hydra");
 
-  std::filesystem::create_directories(dest_path);
+  auto sceneLib = dest_path;
+  sceneLib.append("scenelib");
+  std::filesystem::create_directories(sceneLib);
 
-  hrSceneLibraryOpen(dest_path.wstring().c_str(), HR_WRITE_DISCARD);
+  hrSceneLibraryOpen(sceneLib.wstring().c_str(), HR_WRITE_DISCARD);
 
   HRSceneInstRef scnRef = hrSceneCreate(L"exported_scene");
 
-  load_scene_gltf(src_path, scnRef, export_single_mesh, convert_materials);
+  load_scene_gltf(src_path, dest_path, scnRef, export_single_mesh, convert_materials);
 
   add_default_light(scnRef);
   auto camRef    = add_default_camera();
