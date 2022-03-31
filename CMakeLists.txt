@@ -16,11 +16,10 @@ set(USE_GL OFF CACHE BOOL "HydraAPI with OpenGL support")
 
 if(WIN32)
   set(ADDITIONAL_LIBRARY_DIRS
-          ${HYDRA_API_ROOT_DIR}/dependencies/lib_x64_win)
+          ${HYDRA_API_ROOT_DIR}/dependencies/lib_x64_win CACHE STRING "Path to HydraAPI dependencies (freeimage and, if OpenGL is used, glfw)")
 else()
-  set(USE_FIND_PACKAGE OFF CACHE BOOL "Use find_package to find system installation of dependencies")
   set(ADDITIONAL_LIBRARY_DIRS
-          ${HYDRA_API_ROOT_DIR}/dependencies/lib_x64_linux)
+          ${HYDRA_API_ROOT_DIR}/dependencies/lib_x64_linux CACHE STRING "Path to HydraAPI dependencies (freeimage and, if OpenGL is used, glfw)")
 endif()
 
 
