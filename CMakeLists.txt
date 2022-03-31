@@ -12,24 +12,29 @@ set(HYDRA_API_SRC_DIR ${HYDRA_API_ROOT_DIR}/hydra_api)
 set(HYDRA_API_LIB_DIR ${HYDRA_API_ROOT_DIR}/bin)
 set(HYDRA_API_UTILS_SRC_DIR ${HYDRA_API_ROOT_DIR}/utils)
 
-
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules")
+set(USE_GL OFF CACHE BOOL "HydraAPI with OpenGL support")
 
 if(WIN32)
-  include_directories(${HYDRA_API_ROOT_DIR}/dependencies/include)
-  link_directories(${HYDRA_API_ROOT_DIR}/dependencies/lib_x64_win)
+  set(ADDITIONAL_LIBRARY_DIRS
+          ${HYDRA_API_ROOT_DIR}/dependencies/lib_x64_win)
 else()
-  find_package(glfw3 REQUIRED)
-  include_directories(${GLFW_INCLUDE_DIRS})
-  set(LIBS ${LIBS} ${GLFW_LIBRARIES})
-  find_package (Threads REQUIRED)
-  set(THREADS_PREFER_PTHREAD_FLAG ON)
+  set(USE_FIND_PACKAGE OFF CACHE BOOL "Use find_package to find system installation of dependencies")
+  set(ADDITIONAL_LIBRARY_DIRS
+          ${HYDRA_API_ROOT_DIR}/dependencies/lib_x64_linux)
 endif()
 
-find_package(OpenGL REQUIRED)
-find_package(FreeImage REQUIRED)
-include_directories(${FREEIMAGE_INCLUDE_DIRS})
-set(LIBS ${LIBS} ${FREEIMAGE_LIBRARIES})
+
+include_directories(${HYDRA_API_ROOT_DIR}/dependencies/include)
+link_directories(${ADDITIONAL_LIBRARY_DIRS})
+
+find_package (Threads REQUIRED)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+
+
+if(USE_GL)
+    find_package(OpenGL REQUIRED)
+endif()
+
 
 set(SOURCE_FILES
         convert_common.cpp
@@ -52,17 +57,20 @@ find_library(HYDRA_API_CORTO corto HINTS ${HYDRA_API_LIB_DIR} NO_DEFAULT_PATH)
 find_library(HYDRA_API_CLEW clew HINTS ${HYDRA_API_LIB_DIR} NO_DEFAULT_PATH)
 
 
-if(WIN32)
-  target_link_libraries(scene-converter PUBLIC
+target_link_libraries(scene-converter PUBLIC 
           ${HYDRA_API_LIB}
           ${HYDRA_API_IES_PARSER_LIB} ${HYDRA_API_MIKKTSPACE} ${HYDRA_API_CORTO} ${HYDRA_API_CLEW}
-          ${OPENGL_gl_LIBRARY} ${LIBS} glfw3dll)
+          freeimage)
+          
+if(WIN32) 
+  if(USE_GL)
+    target_link_libraries(scene-converter ${OPENGL_gl_LIBRARY} glfw3dll)
+  endif()
 else()
-  target_link_libraries(scene-converter LINK_PUBLIC
-          ${HYDRA_API_LIB}
-          ${HYDRA_API_IES_PARSER_LIB} ${HYDRA_API_MIKKTSPACE} ${HYDRA_API_CORTO}
-          ${LIBS}
-          Threads::Threads rt dl OpenCL glfw)
+  target_link_libraries(scene-converter LINK_PUBLIC Threads::Threads rt dl OpenCL) 
+  if(USE_GL)
+    target_link_libraries(scene-converter ${OPENGL_gl_LIBRARY} glfw)
+  endif()
 endif()
 
 
