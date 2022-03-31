@@ -14,6 +14,8 @@ set(HYDRA_API_UTILS_SRC_DIR ${HYDRA_API_ROOT_DIR}/utils)
 
 set(USE_GL OFF CACHE BOOL "HydraAPI with OpenGL support")
 
+set(ADDITIONAL_INCLUDE_DIRS
+        ${HYDRA_API_ROOT_DIR}/dependencies/include CACHE STRING "Path to HydraAPI dependencies (freeimage and, if OpenGL is used, glfw)")
 if(WIN32)
   set(ADDITIONAL_LIBRARY_DIRS
           ${HYDRA_API_ROOT_DIR}/dependencies/lib_x64_win CACHE STRING "Path to HydraAPI dependencies (freeimage and, if OpenGL is used, glfw)")
@@ -23,7 +25,7 @@ else()
 endif()
 
 
-include_directories(${HYDRA_API_ROOT_DIR}/dependencies/include)
+include_directories(${ADDITIONAL_INCLUDE_DIRS})
 link_directories(${ADDITIONAL_LIBRARY_DIRS})
 
 find_package (Threads REQUIRED)
