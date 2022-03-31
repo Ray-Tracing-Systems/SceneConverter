@@ -55,17 +55,20 @@ find_library(HYDRA_API_LIB hydra_api HINTS ${HYDRA_API_LIB_DIR} NO_DEFAULT_PATH)
 find_library(HYDRA_API_IES_PARSER_LIB ies_parser HINTS ${HYDRA_API_LIB_DIR} NO_DEFAULT_PATH)
 find_library(HYDRA_API_MIKKTSPACE mikktspace HINTS ${HYDRA_API_LIB_DIR} NO_DEFAULT_PATH)
 find_library(HYDRA_API_CORTO corto HINTS ${HYDRA_API_LIB_DIR} NO_DEFAULT_PATH)
-find_library(HYDRA_API_CLEW clew HINTS ${HYDRA_API_LIB_DIR} NO_DEFAULT_PATH)
+
+if(WIN32)
+    find_library(HYDRA_API_CLEW clew HINTS ${HYDRA_API_LIB_DIR} NO_DEFAULT_PATH)
+endif()
 
 
 target_link_libraries(scene-converter PUBLIC 
           ${HYDRA_API_LIB}
-          ${HYDRA_API_IES_PARSER_LIB} ${HYDRA_API_MIKKTSPACE} ${HYDRA_API_CORTO} ${HYDRA_API_CLEW}
+          ${HYDRA_API_IES_PARSER_LIB} ${HYDRA_API_MIKKTSPACE} ${HYDRA_API_CORTO}
           freeimage)
           
 if(WIN32) 
   if(USE_GL)
-    target_link_libraries(scene-converter ${OPENGL_gl_LIBRARY} glfw3dll)
+    target_link_libraries(scene-converter  ${HYDRA_API_CLEW} ${OPENGL_gl_LIBRARY} glfw3dll)
   endif()
 else()
   target_link_libraries(scene-converter LINK_PUBLIC Threads::Threads rt dl OpenCL) 
