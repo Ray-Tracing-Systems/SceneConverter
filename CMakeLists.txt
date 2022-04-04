@@ -61,19 +61,19 @@ else()
 endif()
 
 
-target_link_libraries(scene-converter PUBLIC 
+target_link_libraries(scene-converter LINK_PUBLIC
           ${HYDRA_API_LIB}
           ${HYDRA_API_IES_PARSER_LIB} ${HYDRA_API_MIKKTSPACE} ${HYDRA_API_CORTO}
           freeimage)
           
 if(WIN32) 
   if(USE_GL)
-    target_link_libraries(scene-converter  ${HYDRA_API_CLEW} ${OPENGL_gl_LIBRARY} glfw3dll)
+    target_link_libraries(scene-converter LINK_PUBLIC ${HYDRA_API_CLEW} ${OPENGL_gl_LIBRARY} glfw3dll)
   endif()
 else()
   target_link_libraries(scene-converter LINK_PUBLIC Threads::Threads rt dl OpenCL::OpenCL)
   if(USE_GL)
-    target_link_libraries(scene-converter ${OPENGL_gl_LIBRARY} glfw)
+    target_link_libraries(scene-converter LINK_PUBLIC ${OPENGL_gl_LIBRARY} glfw)
   endif()
 endif()
 
