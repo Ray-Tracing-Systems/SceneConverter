@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <iostream>
 #include <cassert>
+#include <cstring>
 
 SCENE_TYPE guessSceneTypeFromExt(const std::filesystem::path& scenePath)
 {

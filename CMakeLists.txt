@@ -31,11 +31,9 @@ link_directories(${ADDITIONAL_LIBRARY_DIRS})
 find_package (Threads REQUIRED)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 
-
 if(USE_GL)
     find_package(OpenGL REQUIRED)
 endif()
-
 
 set(SOURCE_FILES
         convert_common.cpp
@@ -58,6 +56,8 @@ find_library(HYDRA_API_CORTO corto HINTS ${HYDRA_API_LIB_DIR} NO_DEFAULT_PATH)
 
 if(WIN32)
     find_library(HYDRA_API_CLEW clew HINTS ${HYDRA_API_LIB_DIR} NO_DEFAULT_PATH)
+else()
+    find_package(OpenCL REQUIRED)
 endif()
 
 
@@ -71,7 +71,7 @@ if(WIN32)
     target_link_libraries(scene-converter  ${HYDRA_API_CLEW} ${OPENGL_gl_LIBRARY} glfw3dll)
   endif()
 else()
-  target_link_libraries(scene-converter LINK_PUBLIC Threads::Threads rt dl OpenCL) 
+  target_link_libraries(scene-converter LINK_PUBLIC Threads::Threads rt dl OpenCL::OpenCL)
   if(USE_GL)
     target_link_libraries(scene-converter ${OPENGL_gl_LIBRARY} glfw)
   endif()
