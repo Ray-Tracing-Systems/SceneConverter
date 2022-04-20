@@ -49,26 +49,41 @@ include_directories(${HYDRA_API_SRC_DIR} ${HYDRA_API_UTILS_SRC_DIR})
 include_directories("external")
 include_directories("external/stb_image")
 
-find_library(HYDRA_API_LIB hydra_api HINTS ${HYDRA_API_LIB_DIR} NO_DEFAULT_PATH)
-find_library(HYDRA_API_IES_PARSER_LIB ies_parser HINTS ${HYDRA_API_LIB_DIR} NO_DEFAULT_PATH)
-find_library(HYDRA_API_MIKKTSPACE mikktspace HINTS ${HYDRA_API_LIB_DIR} NO_DEFAULT_PATH)
-find_library(HYDRA_API_CORTO corto HINTS ${HYDRA_API_LIB_DIR} NO_DEFAULT_PATH)
+find_library(HYDRA_API_LIB_DEBUG            hydra_api  HINTS ${HYDRA_API_LIB_DIR}/Debug NO_DEFAULT_PATH)
+find_library(HYDRA_API_IES_PARSER_LIB_DEBUG ies_parser HINTS ${HYDRA_API_LIB_DIR}/Debug NO_DEFAULT_PATH)
+find_library(HYDRA_API_MIKKTSPACE_DEBUG     mikktspace HINTS ${HYDRA_API_LIB_DIR}/Debug NO_DEFAULT_PATH)
+find_library(HYDRA_API_CORTO_DEBUG          corto      HINTS ${HYDRA_API_LIB_DIR}/Debug NO_DEFAULT_PATH)
+
+
+find_library(HYDRA_API_LIB_RELEASE            hydra_api  HINTS ${HYDRA_API_LIB_DIR}/Release NO_DEFAULT_PATH)
+find_library(HYDRA_API_IES_PARSER_LIB_RELEASE ies_parser HINTS ${HYDRA_API_LIB_DIR}/Release NO_DEFAULT_PATH)
+find_library(HYDRA_API_MIKKTSPACE_RELEASE     mikktspace HINTS ${HYDRA_API_LIB_DIR}/Release NO_DEFAULT_PATH)
+find_library(HYDRA_API_CORTO_RELEASE          corto      HINTS ${HYDRA_API_LIB_DIR}/Release NO_DEFAULT_PATH)
 
 if(WIN32)
-    find_library(HYDRA_API_CLEW clew HINTS ${HYDRA_API_LIB_DIR} NO_DEFAULT_PATH)
+    find_library(HYDRA_API_CLEW_DEBUG   clew HINTS ${HYDRA_API_LIB_DIR}/Debug   NO_DEFAULT_PATH)
+	find_library(HYDRA_API_CLEW_RELEASE clew HINTS ${HYDRA_API_LIB_DIR}/Release NO_DEFAULT_PATH)
 else()
     find_package(OpenCL REQUIRED)
 endif()
 
-
-target_link_libraries(scene-converter LINK_PUBLIC
-          ${HYDRA_API_LIB}
-          ${HYDRA_API_IES_PARSER_LIB} ${HYDRA_API_MIKKTSPACE} ${HYDRA_API_CORTO}
-          freeimage)
+target_link_libraries(scene-converter LINK_PUBLIC debug     
+	${HYDRA_API_LIB_DEBUG}
+	${HYDRA_API_IES_PARSER_LIB_DEBUG}
+	${HYDRA_API_MIKKTSPACE_DEBUG}
+	${HYDRA_API_CORTO_DEBUG})
+target_link_libraries(scene-converter LINK_PUBLIC optimized 
+	${HYDRA_API_LIB_RELEASE}
+	${HYDRA_API_IES_PARSER_LIB_RELEASE}
+	${HYDRA_API_MIKKTSPACE_RELEASE}
+	${HYDRA_API_CORTO_RELEASE})
+target_link_libraries(scene-converter LINK_PUBLIC freeimage)
           
 if(WIN32) 
   if(USE_GL)
-    target_link_libraries(scene-converter LINK_PUBLIC ${HYDRA_API_CLEW} ${OPENGL_gl_LIBRARY} glfw3dll)
+  	target_link_libraries(scene-converter LINK_PUBLIC debug ${HYDRA_API_CLEW_DEBUG})
+	target_link_libraries(scene-converter LINK_PUBLIC optimized ${HYDRA_API_CLEW_RELEASE})
+    target_link_libraries(scene-converter LINK_PUBLIC ${OPENGL_gl_LIBRARY} glfw3dll)
   endif()
 else()
   target_link_libraries(scene-converter LINK_PUBLIC Threads::Threads rt dl OpenCL::OpenCL)
