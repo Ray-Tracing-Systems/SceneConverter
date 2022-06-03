@@ -4,9 +4,10 @@ Converts .gltf and .obj scenes to HydraXML format. Optionally, can also output s
 
 ### Building
 
-1. Clone alongside HydraAPI (i.e. SceneConverter dir and HydraAPI dir should be in the same parent directory).
-
-2. Build using cmake (under Windows build with the same MSVC compiler as HydraAPI)
+1. Clone and build [HydraAPI](https://github.com/Ray-Tracing-Systems/HydraAPI).
+2. Clone SceneConverter.
+3. Configure using CMake - set paths to HydraAPI sources and dependencies, USE_GL to the same value as your HydraAPI build.
+4. Build with GCC on Linux or MSVC on Windows (use the same MSVC version as HydraAPI)
 
 ### Usage
 
